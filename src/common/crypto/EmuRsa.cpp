@@ -101,11 +101,9 @@ void mbedtls_swap_endianness(const unsigned char* in_buf, unsigned char* out_buf
 
 void init_tom_lib()
 {
-	// NOTE: init_LTM has been deprecated in favor to crypt_mp_init("L"). However, in the latest master branch crypt_mp_init
-	// is still undefined.
 	static bool need_init = true;
 	if (need_init) {
-		init_LTM();
+		crypt_mp_init("ltm");
 		need_init = false;
 	}
 }
@@ -118,13 +116,13 @@ bool xbox_exp_mod(unsigned char* pA, const unsigned char* pB, const unsigned cha
 	CHK_MP_RET(mp_init(&b));
 	CHK_MP_RET(mp_init(&c));
 	CHK_MP_RET(mp_init(&d));
-	CHK_MP_RET(mp_import(&b, 1, -1, b_size, 0, 0, pB));
-	CHK_MP_RET(mp_import(&c, 1, -1, c_size, 0, 0, pC));
-	CHK_MP_RET(mp_import(&d, 1, -1, d_size, 0, 0, pD));
+	CHK_MP_RET(mp_unpack(&b, 1, MP_LSB_FIRST, b_size, MP_NATIVE_ENDIAN, 0, pB));
+	CHK_MP_RET(mp_unpack(&c, 1, MP_LSB_FIRST, c_size, MP_NATIVE_ENDIAN, 0, pC));
+	CHK_MP_RET(mp_unpack(&d, 1, MP_LSB_FIRST, d_size, MP_NATIVE_ENDIAN, 0, pD));
 
 	CHK_MP_RET(mp_exptmod(&b, &c, &d, &a));
 
-	CHK_MP_RET(mp_export(pA, NULL, -1, a_size, 0, 0, &a));
+	CHK_MP_RET(mp_pack(pA, 1, NULL, MP_LSB_FIRST, a_size, MP_NATIVE_ENDIAN, 0, &a));
 
 	return true;
 }

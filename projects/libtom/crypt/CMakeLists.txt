@@ -9,6 +9,10 @@ if ("${CMAKE_C_COMPILER_ID}" STREQUAL "MSVC")
  _CRT_SECURE_NO_WARNINGS
  _CRT_NONSTDC_NO_DEPRECATE
  )
+ # Suppress warnings in external code
+ add_compile_options(
+ /wd4244 # conversion, possible loss of data
+ )
 endif()
 
 add_compile_definitions(
@@ -247,7 +251,7 @@ file (GLOB SOURCES
  "${CXBXR_ROOT_DIR}/import/libtomcrypt/src/misc/pkcs5/pkcs_5_1.c"
  "${CXBXR_ROOT_DIR}/import/libtomcrypt/src/misc/pkcs5/pkcs_5_2.c"
  "${CXBXR_ROOT_DIR}/import/libtomcrypt/src/misc/pkcs5/pkcs_5_test.c"
- "${CXBXR_ROOT_DIR}/import/libtomcrypt/src/misc/pk_get_oid.c"
+ "${CXBXR_ROOT_DIR}/import/libtomcrypt/src/pk/asn1/oid/pk_get.c"
  "${CXBXR_ROOT_DIR}/import/libtomcrypt/src/misc/zeromem.c"
  "${CXBXR_ROOT_DIR}/import/libtomcrypt/src/modes/cbc/cbc_decrypt.c"
  "${CXBXR_ROOT_DIR}/import/libtomcrypt/src/modes/cbc/cbc_done.c"
@@ -329,10 +333,8 @@ file (GLOB SOURCES
  "${CXBXR_ROOT_DIR}/import/libtomcrypt/src/pk/asn1/der/sequence/der_decode_sequence_ex.c"
  "${CXBXR_ROOT_DIR}/import/libtomcrypt/src/pk/asn1/der/sequence/der_decode_sequence_flexi.c"
  "${CXBXR_ROOT_DIR}/import/libtomcrypt/src/pk/asn1/der/sequence/der_decode_sequence_multi.c"
- "${CXBXR_ROOT_DIR}/import/libtomcrypt/src/pk/asn1/der/sequence/der_decode_subject_public_key_info.c"
  "${CXBXR_ROOT_DIR}/import/libtomcrypt/src/pk/asn1/der/sequence/der_encode_sequence_ex.c"
  "${CXBXR_ROOT_DIR}/import/libtomcrypt/src/pk/asn1/der/sequence/der_encode_sequence_multi.c"
- "${CXBXR_ROOT_DIR}/import/libtomcrypt/src/pk/asn1/der/sequence/der_encode_subject_public_key_info.c"
  "${CXBXR_ROOT_DIR}/import/libtomcrypt/src/pk/asn1/der/sequence/der_length_sequence.c"
  "${CXBXR_ROOT_DIR}/import/libtomcrypt/src/pk/asn1/der/sequence/der_sequence_free.c"
  "${CXBXR_ROOT_DIR}/import/libtomcrypt/src/pk/asn1/der/sequence/der_sequence_shrink.c"
@@ -386,9 +388,9 @@ file (GLOB SOURCES
  "${CXBXR_ROOT_DIR}/import/libtomcrypt/src/pk/ecc/ecc_shared_secret.c"
  "${CXBXR_ROOT_DIR}/import/libtomcrypt/src/pk/ecc/ecc_sign_hash.c"
  "${CXBXR_ROOT_DIR}/import/libtomcrypt/src/pk/ecc/ecc_sizes.c"
- "${CXBXR_ROOT_DIR}/import/libtomcrypt/src/pk/ecc/ecc_test.c"
  "${CXBXR_ROOT_DIR}/import/libtomcrypt/src/pk/ecc/ecc_verify_hash.c"
- "${CXBXR_ROOT_DIR}/import/libtomcrypt/src/pk/ecc/ltc_ecc_is_valid_idx.c"
+ "${CXBXR_ROOT_DIR}/import/libtomcrypt/src/pk/ecc/ltc_ecc_is_point_at_infinity.c"
+ "${CXBXR_ROOT_DIR}/import/libtomcrypt/src/pk/ecc/ltc_ecc_is_point.c"
  "${CXBXR_ROOT_DIR}/import/libtomcrypt/src/pk/ecc/ltc_ecc_map.c"
  "${CXBXR_ROOT_DIR}/import/libtomcrypt/src/pk/ecc/ltc_ecc_mul2add.c"
  "${CXBXR_ROOT_DIR}/import/libtomcrypt/src/pk/ecc/ltc_ecc_mulmod.c"
@@ -396,13 +398,6 @@ file (GLOB SOURCES
  "${CXBXR_ROOT_DIR}/import/libtomcrypt/src/pk/ecc/ltc_ecc_points.c"
  "${CXBXR_ROOT_DIR}/import/libtomcrypt/src/pk/ecc/ltc_ecc_projective_add_point.c"
  "${CXBXR_ROOT_DIR}/import/libtomcrypt/src/pk/ecc/ltc_ecc_projective_dbl_point.c"
- "${CXBXR_ROOT_DIR}/import/libtomcrypt/src/pk/katja/katja_decrypt_key.c"
- "${CXBXR_ROOT_DIR}/import/libtomcrypt/src/pk/katja/katja_encrypt_key.c"
- "${CXBXR_ROOT_DIR}/import/libtomcrypt/src/pk/katja/katja_export.c"
- "${CXBXR_ROOT_DIR}/import/libtomcrypt/src/pk/katja/katja_exptmod.c"
- "${CXBXR_ROOT_DIR}/import/libtomcrypt/src/pk/katja/katja_free.c"
- "${CXBXR_ROOT_DIR}/import/libtomcrypt/src/pk/katja/katja_import.c"
- "${CXBXR_ROOT_DIR}/import/libtomcrypt/src/pk/katja/katja_make_key.c"
  "${CXBXR_ROOT_DIR}/import/libtomcrypt/src/pk/pkcs1/pkcs_1_i2osp.c"
  "${CXBXR_ROOT_DIR}/import/libtomcrypt/src/pk/pkcs1/pkcs_1_mgf1.c"
  "${CXBXR_ROOT_DIR}/import/libtomcrypt/src/pk/pkcs1/pkcs_1_oaep_decode.c"
@@ -416,11 +411,11 @@ file (GLOB SOURCES
  "${CXBXR_ROOT_DIR}/import/libtomcrypt/src/pk/rsa/rsa_encrypt_key.c"
  "${CXBXR_ROOT_DIR}/import/libtomcrypt/src/pk/rsa/rsa_export.c"
  "${CXBXR_ROOT_DIR}/import/libtomcrypt/src/pk/rsa/rsa_exptmod.c"
- "${CXBXR_ROOT_DIR}/import/libtomcrypt/src/pk/rsa/rsa_free.c"
  "${CXBXR_ROOT_DIR}/import/libtomcrypt/src/pk/rsa/rsa_get_size.c"
  "${CXBXR_ROOT_DIR}/import/libtomcrypt/src/pk/rsa/rsa_import.c"
  "${CXBXR_ROOT_DIR}/import/libtomcrypt/src/pk/rsa/rsa_import_pkcs8.c"
  "${CXBXR_ROOT_DIR}/import/libtomcrypt/src/pk/rsa/rsa_import_x509.c"
+ "${CXBXR_ROOT_DIR}/import/libtomcrypt/src/pk/rsa/rsa_key.c"
  "${CXBXR_ROOT_DIR}/import/libtomcrypt/src/pk/rsa/rsa_make_key.c"
  "${CXBXR_ROOT_DIR}/import/libtomcrypt/src/pk/rsa/rsa_set.c"
  "${CXBXR_ROOT_DIR}/import/libtomcrypt/src/pk/rsa/rsa_sign_hash.c"
