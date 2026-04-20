@@ -9342,15 +9342,22 @@ xbox::void_xt WINAPI xbox::EMUPATCH(D3DDevice_InsertCallback)
 	LOG_INCOMPLETE();
 }
 
+unsigned int MaxRectPatchVertexCount = 0;
+std::map<uint32_t, D3DRECTPATCH_INFO> g_RectPatchInfoCache;
+std::map<uint32_t, D3DTRIPATCH_INFO>  g_TriPatchInfoCache;
+// global flag true: using DrawRectPatch. false: converting patches to triangle stripes.
+bool g_bUseDrawPatch = false;
+INDEX16 IndexedPatchVertex[0x250];
+static inline int GetIndex(int x, int y, int stride) { return x + y * stride; }
 // ******************************************************************
 // * patch: D3DDevice_DrawRectPatch
 // ******************************************************************
 xbox::hresult_xt WINAPI xbox::EMUPATCH(D3DDevice_DrawRectPatch)
 (
 	uint_xt					Handle,
-	CONST float_xt				*pNumSegs,
-	CONST D3DRECTPATCH_INFO *pRectPatchInfo
-)
+	CONST float_xt* pNumSegs,
+	CONST D3DRECTPATCH_INFO* pRectPatchInfo
+	)
 {
 	LOG_FUNC_BEGIN
 		LOG_FUNC_ARG(Handle)
@@ -9359,11 +9366,118 @@ xbox::hresult_xt WINAPI xbox::EMUPATCH(D3DDevice_DrawRectPatch)
 		LOG_FUNC_END;
 
 	CxbxUpdateNativeD3DResources();
+    //setup DrawContext in order to call VertexBufferConverter.Apply() to setup stream source and vertex buffer
+	CxbxDrawContext DrawContext = {};
+	D3DRECTPATCH_INFO tmpRectPatchInfo;
+	if (pRectPatchInfo != nullptr) {
+		g_RectPatchInfoCache.insert(std::pair<uint32_t, D3DRECTPATCH_INFO>(Handle, *pRectPatchInfo));
+	}
+	else {
+		//d3d9 seems unhappy when pRectPatchInfo==nullptr
+		auto it = g_RectPatchInfoCache.find(Handle);
+		tmpRectPatchInfo = it->second;
+		pRectPatchInfo = &tmpRectPatchInfo;
+	}
 
-	HRESULT hRet = g_pD3DDevice->DrawRectPatch( Handle, pNumSegs, pRectPatchInfo );
-	DEBUG_D3DRESULT(hRet, "g_pD3DDevice->DrawRectPatch");
+	DrawContext.XboxPrimitiveType = xbox::X_D3DPRIMITIVETYPE::X_D3DPT_TRIANGLESTRIP;
+	/*
 
-	return hRet;
+	illustration of a 4X3 RectPatch
+  StartVertexOffsetWidth :2
+	  |<----->|
+	 V0  V1   V2  V3  V4           ---
+	        --------------       | StartVertexOffsetHeight:1
+	 V5  V6 | V7  V8  V9 |   ---   ---
+	                         /|\ 
+	V10 V11 |V12 V13 V14 |    |   
+	                          | Height:4
+	V15 V16 |V17 V18 V19 |    |
+	                         \|/
+	V20 V21 |V22 V23 V24 |   --- 
+	        --------------   
+              |<----->|  Width:3
+
+     |<-------------->|  Stride:5
+
+	 start vertex index V7 = StartVertexOffsetWidth + StartVertexOffsetHeight * Stride; 2 + 1*5 =7
+
+	 for any given vertex in position x, y, assuming origin is on top left corner, x positive to right, y positive to down.
+	 the index of given vertex is x + y * Stride
+
+	 give vertex V7, (x,y)=(2,1), index = 2 + 1* 5 =7
+
+	 vertex index in upper row is index(V7) - Stride = 7 - 5 = 2
+	 vertex index in lower rwo is index(V7) + stride = 7 + 5 = 12
+	 vertex index in right is     index(V7) + 1 = 8
+	 vertex index in left is      index(V7) - 1 = 6
+
+	 we're going to create a index buffer to conver the 4X3 RectPatch into 3 triangle strips.
+
+	 V5  V6  V7   V8   V9   
+	          |\  |\  |        
+	          | \ | \ |
+              |  \|  \|
+	V10 V11  V12 V13 V14
+			  |\  |\  |
+			  | \ | \ |
+			  |  \|  \|
+	V15 V16  V17 V18 V19 
+			  |\  |\  |
+			  | \ | \ |
+			  |  \|  \|
+	V20 V21  V22 V23 V24  
+
+	test case: Patch sample uses 4X4 RectPatch
+	test case: True Crime Streets of LA ?
+
+	*/
+
+	// g_bUseDrawPatch is global flag which we can dynamically switch between using DrawRectPatch or converting patches to triangle stripes.
+	if(!g_bUseDrawPatch){
+		int index = 0;
+		int stride = pRectPatchInfo->Stride;
+		int originY = pRectPatchInfo->StartVertexOffsetHeight;
+		int originX = pRectPatchInfo->StartVertexOffsetWidth;
+		int y;
+		int StartVertexIndex= pRectPatchInfo->StartVertexOffsetHeight * pRectPatchInfo->Stride + pRectPatchInfo->StartVertexOffsetWidth;
+		for ( int deltaY = 1; deltaY < (pRectPatchInfo->Height); deltaY++) {
+			y = originY + deltaY;
+			int x;
+			for (int deltaX = 0; deltaX < (pRectPatchInfo->Width); deltaX++) {
+				x = originX + deltaX;
+				/*      
+				          (x,y-1)(x+1,y-1)
+				     V5  V6  V7    V8   V9
+							  |\   |\   |
+							  | \  | \  | 
+							  |  \ |  \ | 
+							  |   \|   \|
+				    V10 V11  V12  V13  V14
+					        (x,y) (x+1,y)
+				1st loop: V12,V7,
+				2nd loop: V13,V8,
+                3rd loop: V14,V9
+				*/
+				IndexedPatchVertex[index++] = GetIndex(  x,   y, stride);
+				IndexedPatchVertex[index++] = GetIndex(  x, y-1, stride);
+			}
+		}
+		DrawContext.dwVertexCount = index;
+		DrawContext.pXboxIndexData = IndexedPatchVertex;
+		DrawContext.dwStartVertex = 0;
+		CxbxDrawIndexed(DrawContext);
+		return S_OK;
+	}
+	else{
+		DrawContext.dwVertexCount = (pRectPatchInfo->StartVertexOffsetHeight + pRectPatchInfo->Height) * pRectPatchInfo->Stride;
+		//keep max. vertex count so we can use same vertex count in DrawContext which will result in using the same vertex buffer cache.
+		if (MaxRectPatchVertexCount < DrawContext.dwVertexCount)MaxRectPatchVertexCount = DrawContext.dwVertexCount;
+		DrawContext.dwVertexCount = MaxRectPatchVertexCount;
+		VertexBufferConverter.Apply(&DrawContext);
+		HRESULT hRet = g_pD3DDevice->DrawRectPatch(Handle, pNumSegs, pRectPatchInfo);
+		DEBUG_D3DRESULT(hRet, "g_pD3DDevice->DrawRectPatch");
+		return hRet;
+	}
 }
 
 // ******************************************************************
